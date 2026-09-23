@@ -269,7 +269,7 @@ export default function ContributionModal({
                   <p className="text-xl font-black text-brand-navy">7.50$ <span className="text-xs font-normal text-slate-500">/ mois</span></p>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed max-w-xs mx-auto">
-                  Soutenez durablement les projets et tutoriels de <span className="font-semibold text-brand-navy">Huvi Optimisation</span> avec un prélèvement automatique mensuel réversible à tout moment.
+                  Soutenez durablement les projets et tutoriels de <span className="font-semibold text-brand-navy">HUVI Optimisation</span> avec un prélèvement automatique mensuel réversible à tout moment.
                 </p>
               </div>
             ) : (
@@ -399,7 +399,7 @@ export default function ContributionModal({
             {/* Security Notice */}
             <div className="flex items-center gap-1.5 justify-center text-[10px] text-slate-400 pt-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Chiffrement bancaire direct de bout en bout</span>
+              <span>Paiement traité par Stripe. Aucune donnée bancaire sur ce site.</span>
             </div>
 
             {/* Submit Action */}
