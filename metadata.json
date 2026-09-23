@@ -1,6 +1,0 @@
-{
-  "name": "Café & Co - Espace de Soutien",
-  "description": "Une page de dons élégante et sécurisée style Buy Me a Coffee pour soutenir mes projets créatifs.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
