@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   Coffee as CoffeeIcon, 
   Heart as HeartIcon, 
@@ -17,10 +17,16 @@ import {
 import { CreatorProfile, Contribution } from './types';
 import { DEFAULT_PROFILE, DEFAULT_CONTRIBUTIONS } from './utils/defaults';
 import SecurityBadge from './components/SecurityBadge';
-import CustomizerPanel from './components/CustomizerPanel';
 import ContributionModal from './components/ContributionModal';
 import ContributionTicker from './components/ContributionTicker';
 import AmbientPlayer from './components/AmbientPlayer';
+
+// Panneau de personnalisation = outil de gestion LOCAL (dev) uniquement.
+// `import.meta.env.DEV` est remplacé par `false` au build : Rollup élimine alors
+// le dynamic import, donc le composant n'existe plus dans le bundle public.
+const DevCustomizerPanel = import.meta.env.DEV
+  ? lazy(() => import('./components/CustomizerPanel'))
+  : null;
 
 function formatRelativeTime(isoString: string): string {
   try {
@@ -48,14 +54,18 @@ export default function App() {
   const [modalInitialSuccess, setModalInitialSuccess] = useState(false);
   const [lastPaymentAmount, setLastPaymentAmount] = useState<number>(0);
 
-  // Load profile and contributions from localstorage on mount
+  // Load contributions from localstorage on mount.
+  // Le profil public est TOUJOURS celui compilé dans src/utils/defaults.ts : la
+  // surcharge localStorage (outil de gestion local) n'existe qu'en développement.
   useEffect(() => {
-    const savedProfile = localStorage.getItem('creator_profile');
-    if (savedProfile) {
-      try {
-        setProfile(JSON.parse(savedProfile));
-      } catch (e) {
-        console.error("Error parsing saved profile, using defaults", e);
+    if (import.meta.env.DEV) {
+      const savedProfile = localStorage.getItem('creator_profile');
+      if (savedProfile) {
+        try {
+          setProfile(JSON.parse(savedProfile));
+        } catch (e) {
+          console.error("Error parsing saved profile, using defaults", e);
+        }
       }
     }
 
@@ -150,7 +160,7 @@ export default function App() {
             <div className="w-8 h-8 rounded-lg bg-brand-orange flex items-center justify-center text-white font-extrabold text-sm shadow-sm">
               ☕
             </div>
-            <span className="font-extrabold text-xs sm:text-sm tracking-wider text-white uppercase">Huvi Café</span>
+            <span className="font-extrabold text-xs sm:text-sm tracking-wider text-white uppercase">HUVI Café</span>
           </div>
 
           {/* Secure indicator & Owner Mode toggle */}
@@ -160,26 +170,31 @@ export default function App() {
               Sécurisé Stripe
             </span>
 
-            <div className="h-4 w-px bg-slate-800" />
+            {/* Outil de gestion local : DEV uniquement, absent du bundle public */}
+            {import.meta.env.DEV && (
+              <>
+                <div className="h-4 w-px bg-slate-800" />
 
-            <button
-              id="admin-mode-toggle"
-              onClick={() => setIsAdminView(!isAdminView)}
-              className={`text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                isAdminView 
-                  ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <SettingsIcon className={`w-3.5 h-3.5 ${isAdminView ? 'animate-spin-slow' : ''}`} />
-              <span>{isAdminView ? "Éditeur : ON" : "Accès Créateur"}</span>
-            </button>
+                <button
+                  id="admin-mode-toggle"
+                  onClick={() => setIsAdminView(!isAdminView)}
+                  className={`text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                    isAdminView 
+                      ? 'bg-brand-orange/20 text-brand-orange border border-brand-orange/30' 
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <SettingsIcon className={`w-3.5 h-3.5 ${isAdminView ? 'animate-spin-slow' : ''}`} />
+                  <span>{isAdminView ? "Éditeur : ON" : "Accès Créateur"}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Admin Quick Action Bar */}
-      {isAdminView && (
+      {/* Admin Quick Action Bar — DEV uniquement */}
+      {import.meta.env.DEV && isAdminView && (
         <div id="admin-quick-bar" className="bg-brand-orange/10 border-b border-brand-orange/20 text-center py-2 px-4 animate-fade-in text-xs text-brand-orange flex items-center justify-center gap-3">
           <span className="font-semibold">Mode d'édition activé : Vous pouvez personnaliser les liens Stripe et les réseaux sociaux.</span>
           <button 
@@ -435,7 +450,7 @@ export default function App() {
                   <span>Payer un café</span>
                 </button>
                 <p className="text-[9px] text-slate-400 mt-2">
-                  🔒 Paiements chiffrés directement sur les serveurs Stripe
+                  🔒 Paiement traité par Stripe. Aucune donnée bancaire sur ce site.
                 </p>
               </div>
             </div>
@@ -500,25 +515,40 @@ export default function App() {
       <footer id="app-footer" className="bg-brand-navy border-t border-slate-800 text-slate-400 text-[11px] py-9 text-center mt-auto">
         <div className="max-w-4xl mx-auto px-4 space-y-3.5">
           <p className="text-slate-300 font-semibold text-xs">
-            {profile.name} • Propulsé par <a href="https://huvioptimisation.com" target="_blank" rel="noopener noreferrer" className="text-brand-orange hover:underline font-bold transition-colors">HUVI Optimisation</a>
+            HUVI Optimisation — Hugo Viens
           </p>
+          <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px]">
+            <a href="https://huvioptimisation.com" target="_blank" rel="noopener noreferrer" className="text-brand-orange hover:underline font-bold transition-colors">Site principal</a>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <a href="https://bilan.huvioptimisation.com" target="_blank" rel="noopener noreferrer" className="text-brand-orange hover:underline font-bold transition-colors">Bilan IA (gratuit)</a>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <a href="https://marges.huvioptimisation.com" target="_blank" rel="noopener noreferrer" className="text-brand-orange hover:underline font-bold transition-colors">Marges IQ</a>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <a href="https://www.facebook.com/groups/peakperformeur" target="_blank" rel="noopener noreferrer" className="text-brand-orange hover:underline font-bold transition-colors">Groupe Facebook</a>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <a href="mailto:info@huvioptimisation.com" className="text-brand-orange hover:underline font-bold transition-colors">Contact</a>
+          </nav>
           <p className="max-w-md mx-auto text-[10px] leading-relaxed text-slate-400">
-            Cette page s'exécute de façon autonome sans base de données bancaire tierce. Les transactions confidentielles sont déportées et chiffrées de bout en bout pour garantir la sécurité.
+            Paiements traités par Stripe. Aucune donnée bancaire ne transite ni n'est stockée par ce site.
           </p>
           <div className="text-[10px] text-slate-500 flex items-center justify-center gap-3 pt-1">
-            <span>© 2026</span>
+            <span>© 2026 HUVI Optimisation</span>
           </div>
         </div>
       </footer>
 
-      {/* 6. SIDE CUSTOMIZER PANEL */}
-      <CustomizerPanel
-        isOpen={isCustomizerOpen}
-        onClose={() => setIsCustomizerOpen(false)}
-        profile={profile}
-        onSave={handleSaveProfile}
-        onReset={handleResetProfile}
-      />
+      {/* 6. SIDE CUSTOMIZER PANEL — DEV UNIQUEMENT (jamais dans le bundle public) */}
+      {DevCustomizerPanel && (
+        <Suspense fallback={null}>
+          <DevCustomizerPanel
+            isOpen={isCustomizerOpen}
+            onClose={() => setIsCustomizerOpen(false)}
+            profile={profile}
+            onSave={handleSaveProfile}
+            onReset={handleResetProfile}
+          />
+        </Suspense>
+      )}
 
       {/* 7. SUPPORT MODAL (One-time/Monthly support) */}
       <ContributionModal

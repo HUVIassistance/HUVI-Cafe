@@ -19,7 +19,8 @@ import {
   Music,
   Upload,
   Image as ImageIcon,
-  Trash2
+  Trash2,
+  Copy
 } from 'lucide-react';
 import { CreatorProfile } from '../types';
 
@@ -56,6 +57,8 @@ export default function CustomizerPanel({ isOpen, onClose, profile, onSave, onRe
 
   const [defaultSoundtrack, setDefaultSoundtrack] = useState<'zen' | 'space' | 'warm'>(profile.defaultSoundtrack || 'zen');
   const [autoplayMusic, setAutoplayMusic] = useState(profile.autoplayMusic || false);
+
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -112,6 +115,64 @@ export default function CustomizerPanel({ isOpen, onClose, profile, onSave, onRe
     if (window.confirm("Voulez-vous vraiment réinitialiser les réglages à leur état d'origine ?")) {
       onReset();
       onClose();
+    }
+  };
+
+  // Outil de gestion LOCAL (dev uniquement) : produit le bloc TypeScript de la
+  // configuration courante, prêt à coller dans src/utils/defaults.ts.
+  // Les liens Stripe restent des constantes en dur dans ce fichier : aucune
+  // interface publique ne permet de les modifier.
+  const buildDefaultsBlock = (): string => {
+    const s = (value: string) => JSON.stringify(value);
+    return [
+      'export const DEFAULT_PROFILE: CreatorProfile = {',
+      `  name: ${s(name.trim())},`,
+      `  subtitle: ${s(subtitle.trim())},`,
+      `  bio: ${s(bio.trim())},`,
+      `  avatarUrl: ${s(avatarUrl.trim())},`,
+      `  bannerUrl: ${s(bannerUrl.trim())},`,
+      `  stripeLink: ${s(stripeLink.trim())},`,
+      `  stripeLinkMonthly: ${s(stripeLinkMonthly.trim())},`,
+      '  socials: {',
+      `    website: ${s(website.trim())},`,
+      `    github: ${s(github.trim())},`,
+      `    instagram: ${s(instagram.trim())},`,
+      `    linkedin: ${s(linkedin.trim())},`,
+      `    facebook: ${s(facebook.trim())},`,
+      `    community: ${s(community.trim())},`,
+      `    youtube: ${s(youtube.trim())},`,
+      '  },',
+      `  showGoal: ${showGoal},`,
+      `  goalTarget: ${goalTarget},`,
+      `  defaultSoundtrack: '${defaultSoundtrack}',`,
+      `  autoplayMusic: ${autoplayMusic},`,
+      `  paypalLink: ${s(paypalLink.trim())}`,
+      '};',
+    ].join('\n');
+  };
+
+  const handleExportConfig = async () => {
+    const block = buildDefaultsBlock();
+    try {
+      await navigator.clipboard.writeText(block);
+      setExportStatus("Config copiée. Collez-la dans src/utils/defaults.ts");
+      return;
+    } catch (err) {
+      // Repli si l'API presse-papiers n'est pas disponible
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = block;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setExportStatus("Config copiée. Collez-la dans src/utils/defaults.ts");
+      } catch (err2) {
+        console.error("Export de la config impossible", err2);
+        setExportStatus("Export impossible dans ce navigateur");
+      }
     }
   };
 
@@ -525,25 +586,42 @@ export default function CustomizerPanel({ isOpen, onClose, profile, onSave, onRe
         </form>
 
         {/* Footer actions */}
-        <div className="p-5 border-t border-brand-cream-dark bg-brand-warm-cream flex items-center justify-between gap-3">
+        <div className="p-5 border-t border-brand-cream-dark bg-brand-warm-cream space-y-3">
           <button
-            id="reset-customizer-btn"
+            id="export-config-btn"
             type="button"
-            onClick={handleReset}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer font-medium"
+            onClick={handleExportConfig}
+            title="Copie dans le presse-papiers le bloc TypeScript à coller dans src/utils/defaults.ts"
+            className="w-full px-3.5 py-2.5 bg-brand-navy hover:bg-brand-navy/90 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Réinitialiser
+            <Copy className="w-3.5 h-3.5 text-brand-orange" />
+            Exporter la config
           </button>
-          
-          <button
-            id="save-customizer-btn"
-            onClick={handleSubmit}
-            className="px-4.5 py-2.5 bg-brand-orange hover:bg-brand-orange/90 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1 shadow-md shadow-brand-orange/15 cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            Enregistrer
-          </button>
+
+          {exportStatus && (
+            <p className="text-[10px] font-semibold text-emerald-600 text-center">{exportStatus}</p>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <button
+              id="reset-customizer-btn"
+              type="button"
+              onClick={handleReset}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-500 hover:text-red-500 rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Réinitialiser
+            </button>
+            
+            <button
+              id="save-customizer-btn"
+              onClick={handleSubmit}
+              className="px-4.5 py-2.5 bg-brand-orange hover:bg-brand-orange/90 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1 shadow-md shadow-brand-orange/15 cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Enregistrer
+            </button>
+          </div>
         </div>
       </div>
 

@@ -1,9 +1,9 @@
 import { CreatorProfile, Contribution } from '../types';
 
 export const DEFAULT_PROFILE: CreatorProfile = {
-  name: "Huvi Optimisation",
-  subtitle: "Développeur, Designer & Expert en Optimisation Digitale",
-  bio: "Bienvenue sur mon espace de soutien ! Passionné par le développement d'outils web performants, fluides et hautement sécurisés. Si mes solutions vous font gagner du temps ou enrichissent vos projets, vous pouvez m'offrir un café. Chaque soutien compte et m'aide à concevoir de nouveaux outils libres de droits !",
+  name: "Hugo Viens",
+  subtitle: "Fondateur d'HUVI Optimisation, analyste d'affaires & architecte de systèmes pour PME",
+  bio: "Passionné de plein-air, ancien juriste et propriétaire d'une entreprise spécialisée dans la création de systèmes de gestion d'entreprise sur-mesure et d'automatisation, ma mission dans la vie est de rendre la productivité simple et accessible pour tous.\n\nJ'ai aussi une chaîne YouTube et une communauté privée où je donne un maximum de valeur gratuite sur l'organisation, la structure, la productivité et la technologie sous la forme de lives, de formations, d'outils et de ressources gratuites à tous les travailleurs autonomes, professionnels et propriétaires de PME.\n\nTu as un enjeu présentement ? Écris-moi, j'ai fort probablement quelque chose pour t'aider !",
   avatarUrl: "", // We will render a stunning SVG avatar dynamically if empty
   bannerUrl: "", // We will render a stunning premium dynamic canvas banner if empty
   stripeLink: "https://donate.stripe.com/3cI4gzbMlacdahRdiE8Vi04", // Custom Stripe payment link
