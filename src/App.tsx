@@ -246,9 +246,8 @@ export default function App() {
       {/* 1. BRAND-NAVY TOP HEADER */}
       <header id="app-top-header" className="bg-brand-navy border-b border-slate-800/80 sticky top-0 z-30 text-white shadow-md">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <img src="/logo-huvi-header.png" alt="HUVI Optimisation" className="h-9 sm:h-10 w-auto" />
-            <span className="font-extrabold text-xs sm:text-sm tracking-wider text-white uppercase">HUVI Café</span>
           </div>
 
           {/* Secure indicator & Owner Mode toggle */}
