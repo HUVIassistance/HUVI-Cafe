@@ -11,6 +11,11 @@ interface ContributionModalProps {
   onAddContribution: (contribution: Omit<Contribution, 'id' | 'timestamp'>) => void;
   initialSuccess?: boolean;
   successAmount?: number;
+  // Identité réelle du paiement capturée par App avant purge de pending_contribution :
+  // utilisée en repli quand le modal est ouvert par l'URL de retour Stripe/PayPal
+  // (le formulaire n'a alors jamais été soumis dans la session en cours).
+  initialName?: string;
+  initialMessage?: string;
 }
 
 export default function ContributionModal({ 
@@ -21,7 +26,9 @@ export default function ContributionModal({
   paypalLink,
   onAddContribution,
   initialSuccess = false,
-  successAmount = 0
+  successAmount = 0,
+  initialName = '',
+  initialMessage = ''
 }: ContributionModalProps) {
   const [paymentType, setPaymentType] = useState<'one-time' | 'monthly'>('one-time');
   const [coffeesCount, setCoffeesCount] = useState<number | 'custom'>(3);
@@ -63,6 +70,11 @@ export default function ContributionModal({
   };
 
   const finalAmount = getFinalAmount();
+
+  // Écran de succès : repli sur l'identité du paiement (props) quand aucun champ
+  // du formulaire n'a été rempli dans cette session.
+  const displayName = (name && name.trim()) || initialName || 'Anonyme';
+  const displayMessage = message.trim() ? message : initialMessage;
 
   const handleGatewaySelection = (gateway: 'stripe' | 'paypal') => {
     setSelectedGateway(gateway);
@@ -473,13 +485,13 @@ export default function ContributionModal({
             <div className="space-y-1.5">
               <h2 className="text-base sm:text-lg font-black text-brand-navy">Merci infiniment !</h2>
               <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                Votre soutien de <strong className="text-brand-orange font-bold">{finalAmount}$</strong> a bien été reçu ! Votre message est désormais visible par tous sur le mur de soutien.
+                Votre soutien de <strong className="text-brand-orange font-bold">{finalAmount}$</strong> a bien été reçu — merci !
               </p>
               
               <div className="bg-brand-warm-cream border border-brand-cream-dark/65 p-3.5 rounded-xl text-left max-w-xs mx-auto mt-2 text-xs space-y-1">
-                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre publication :</p>
-                <p className="font-extrabold text-brand-navy">{isAnonymous ? 'Anonyme' : name || 'Anonyme'}</p>
-                {message.trim() && <p className="text-[10px] text-slate-500 italic">"{message}"</p>}
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Votre soutien :</p>
+                <p className="font-extrabold text-brand-navy">{isAnonymous ? 'Anonyme' : displayName}</p>
+                {displayMessage.trim() && <p className="text-[10px] text-slate-500 italic">"{displayMessage}"</p>}
               </div>
             </div>
 
