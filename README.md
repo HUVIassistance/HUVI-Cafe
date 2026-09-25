@@ -14,11 +14,13 @@ référencée dans la navigation des autres sites HUVI.
 - Aucun secret ni variable d'environnement : les deux liens de paiement Stripe sont des constantes dans `src/utils/defaults.ts`.
 - Aucune donnée bancaire ne transite par cette page. Le paiement est délégué à Stripe (lien externe).
 - Aucune surface d'édition publique : le panneau de personnalisation n'existe qu'en local, en mode `dev`.
-- Le mur de soutien est local au navigateur du visiteur (localStorage). Il n'y a pas de compteur global.
+- Le mur de soutien public est un fichier JSON versionné dans le repo (`public/wall.json`), alimenté à la main.
+  Les soutiens locaux au navigateur du visiteur (localStorage) s'y ajoutent sur son propre écran, sans doublon.
 
 ## Structure des fichiers
 
 ```
+public/wall.json                  MUR DE SOUTIEN PUBLIC (source de vérité, alimenté à la main)
 index.html                        gabarit HTML (lang=fr, noindex, meta OG, polices Manrope + JetBrains Mono)
 CNAME                             domaine personnalisé GitHub Pages : cafe.huvioptimisation.com
 package.json / package-lock.json  dépendances et build (lockfile commité pour des builds reproductibles)
@@ -44,6 +46,24 @@ src/components/AmbientPlayer.tsx      lecteur d'ambiance sonore
 2. Ou lancer `npm run dev`, utiliser le panneau (bouton « Accès Créateur ») puis « Exporter la config » :
    le bloc TypeScript généré se colle dans `src/utils/defaults.ts`.
 3. Commiter et pousser sur `main` : le workflow reconstruit et redéploie le site.
+
+## Ajouter un soutien au mur public
+
+Le mur public (`public/wall.json`) s'alimente **à la main** : aucun service, aucune clé, aucune automatisation.
+Un soutien n'apparaît donc sur le mur que lorsqu'il y est ajouté explicitement (c'est pourquoi l'écran de
+succès annonce au donateur que son message « apparaîtra bientôt sur le mur »).
+
+1. Ouvrir `public/wall.json` sur GitHub (HUVIassistance/HUVI-Cafe) et cliquer sur le crayon (« Edit this file »).
+2. Ajouter un objet `{ name, amount, message, date }` dans la liste `soutiens` (`amount` en dollars, sans le
+   symbole `$` ; `date` au format `AAAA-MM-JJ`), puis mettre `maj` à la date du jour.
+3. « Commit changes » sur `main` : le workflow GitHub Pages reconstruit et redéploie le site seul (~2 min).
+
+**Modération** : supprimer une ligne (ou vider son `message`) puis commiter fait disparaître ce soutien du mur
+public au rebuild suivant. Aucun autre geste n'est nécessaire.
+
+Détails techniques : le site lit `/wall.json` au chargement et recalcule à partir de lui le nombre de soutiens,
+les cafés récoltés et la barre de progression. Si le fichier est absent, vide ou invalide, le site retombe
+automatiquement sur les soutiens par défaut de `src/utils/defaults.ts` — jamais d'écran cassé.
 
 ## Builder en local
 
