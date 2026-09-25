@@ -485,7 +485,7 @@ export default function ContributionModal({
             <div className="space-y-1.5">
               <h2 className="text-base sm:text-lg font-black text-brand-navy">Merci infiniment !</h2>
               <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                Votre soutien de <strong className="text-brand-orange font-bold">{finalAmount}$</strong> a bien été reçu — merci !
+                Votre soutien de <strong className="text-brand-orange font-bold">{finalAmount}$</strong> a bien été reçu ! Votre message apparaîtra bientôt sur le mur de soutien.
               </p>
               
               <div className="bg-brand-warm-cream border border-brand-cream-dark/65 p-3.5 rounded-xl text-left max-w-xs mx-auto mt-2 text-xs space-y-1">
