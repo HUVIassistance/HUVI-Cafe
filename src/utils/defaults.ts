@@ -4,7 +4,7 @@ export const DEFAULT_PROFILE: CreatorProfile = {
   name: "Hugo Viens",
   subtitle: "Fondateur d'HUVI Optimisation, analyste d'affaires & architecte de systèmes pour PME",
   bio: "Passionné de plein-air, ancien juriste et propriétaire d'une entreprise spécialisée dans la création de systèmes de gestion d'entreprise sur-mesure et d'automatisation, ma mission dans la vie est de rendre la productivité simple et accessible pour tous.\n\nJ'ai aussi une chaîne YouTube et une communauté privée où je donne un maximum de valeur gratuite sur l'organisation, la structure, la productivité et la technologie sous la forme de lives, de formations, d'outils et de ressources gratuites à tous les travailleurs autonomes, professionnels et propriétaires de PME.\n\nTu as un enjeu présentement ? Écris-moi, j'ai fort probablement quelque chose pour t'aider !",
-  avatarUrl: "", // We will render a stunning SVG avatar dynamically if empty
+  avatarUrl: "/hugo-viens.jpg",
   bannerUrl: "", // We will render a stunning premium dynamic canvas banner if empty
   stripeLink: "https://donate.stripe.com/3cI4gzbMlacdahRdiE8Vi04", // Custom Stripe payment link
   stripeLinkMonthly: "https://donate.stripe.com/4gM7sL17Hckley792o8Vi05", // Custom Monthly subscription Stripe link
