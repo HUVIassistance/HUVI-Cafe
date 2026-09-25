@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { 
   Coffee as CoffeeIcon, 
-  Heart as HeartIcon, 
   ShieldCheck as ShieldCheckIcon, 
   Globe as GlobeIcon, 
   Twitter as TwitterIcon, 
@@ -74,11 +73,36 @@ function formatRelativeTime(isoString: string): string {
   }
 }
 
+// Libellés de mois en français : un simple tableau suffit, aucune dépendance nouvelle
+// (pas de librairie de dates, pas d'Intl lourd côté bundle).
+const FRENCH_MONTHS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+];
+
+// Date de mise à jour du mur : « 2026-09-25 » → « 25 septembre 2026 ».
+// Toute valeur absente ou hors format AAAA-MM-JJ renvoie null : jamais de date inventée,
+// la ligne n'est alors simplement pas affichée.
+function formatWallUpdatedAt(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${day} ${FRENCH_MONTHS[month - 1]} ${year}`;
+}
+
 export default function App() {
   const [profile, setProfile] = useState<CreatorProfile>(DEFAULT_PROFILE);
   // Mur public (wall.json) et soutiens locaux du visiteur sont gardés séparément ;
-  // `contributions` ci-dessous est l'union affichée et comptée.
+  // `contributions` ci-dessous est l'union AFFICHÉE (liste du mur + toast), tandis que le
+  // compteur de cafés ne dépend que du mur public (`publicWall`).
   const [wallContributions, setWallContributions] = useState<Contribution[]>([]);
+  // Date de mise à jour du mur, telle que fournie par `maj` dans wall.json, déjà formatée
+  // pour l'affichage. `null` = pas de date fiable → la ligne n'est pas rendue.
+  const [wallUpdatedAt, setWallUpdatedAt] = useState<string | null>(null);
   const [localContributions, setLocalContributions] = useState<Contribution[]>([]);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -174,16 +198,23 @@ export default function App() {
         if (cancelled) return;
         const rawList = (data as { soutiens?: unknown } | null)?.soutiens;
         const entries = Array.isArray(rawList) ? rawList : [];
-        setWallContributions(
-          entries
-            .map((entry, index) => wallEntryToContribution(entry, index))
-            .filter((item): item is Contribution => item !== null)
+        const parsedEntries = entries
+          .map((entry, index) => wallEntryToContribution(entry, index))
+          .filter((item): item is Contribution => item !== null);
+        setWallContributions(parsedEntries);
+        // La date n'est reprise que si le mur public a réellement été lu (au moins une
+        // entrée valide) : en repli sur DEFAULT_CONTRIBUTIONS, on n'affiche AUCUNE date.
+        setWallUpdatedAt(
+          parsedEntries.length > 0
+            ? formatWallUpdatedAt((data as { maj?: unknown } | null)?.maj)
+            : null
         );
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn("Mur de soutien public indisponible : repli sur les soutiens par défaut.", err);
         setWallContributions([]);
+        setWallUpdatedAt(null);
       });
 
     return () => {
@@ -191,11 +222,18 @@ export default function App() {
     };
   }, []);
 
-  // Mur affiché = soutiens publics (wall.json) + soutiens locaux du visiteur, sans doublon.
+  // Mur public = source de vérité du compteur : wall.json uniquement, avec repli sur
+  // DEFAULT_CONTRIBUTIONS si le fichier est absent, vide ou invalide. Les soutiens locaux
+  // n'entrent JAMAIS ici : le chiffre affiché est donc identique pour tous les visiteurs.
+  const publicWall: Contribution[] = useMemo(
+    () => (wallContributions.length > 0 ? wallContributions : DEFAULT_CONTRIBUTIONS),
+    [wallContributions]
+  );
+
+  // Mur affiché = soutiens locaux du visiteur + soutiens publics, sans doublon.
   // Un mur public vide ou invalide retombe sur DEFAULT_CONTRIBUTIONS : jamais d'écran cassé,
-  // jamais de chiffre inventé.
+  // jamais de chiffre inventé. Le mur ne sert QUE à l'affichage (liste + toast), pas au compteur.
   const contributions: Contribution[] = useMemo(() => {
-    const publicWall = wallContributions.length > 0 ? wallContributions : DEFAULT_CONTRIBUTIONS;
     const seen = new Set(publicWall.map(contributionSignature));
     const ownAndNotPublicYet = localContributions.filter((item) => {
       const signature = contributionSignature(item);
@@ -204,7 +242,7 @@ export default function App() {
       return true;
     });
     return [...ownAndNotPublicYet, ...publicWall];
-  }, [wallContributions, localContributions]);
+  }, [publicWall, localContributions]);
 
   const handleSaveProfile = (updatedProfile: CreatorProfile) => {
     setProfile(updatedProfile);
@@ -233,9 +271,14 @@ export default function App() {
   };
 
   // Calculate statistics
+  // Compteur de cafés : calculé UNIQUEMENT sur le mur public (wall.json, avec repli sur les
+  // soutiens par défaut). Les soutiens locaux du visiteur n'y entrent pas → chiffre identique
+  // pour tous les visiteurs. 1 café = 5 $.
+  const wallAmount = publicWall.reduce((sum, item) => sum + item.amount, 0);
+  const coffeesCollected = Math.round(wallAmount / 5);
+  // Somme utilisée uniquement par la barre de progression (masquée : profile.showGoal = false).
   const totalAmount = contributions.reduce((sum, item) => sum + item.amount, 0);
-  const totalSupporters = contributions.length;
-  
+
   // Use customizable target, default to 500
   const targetGoal = profile.goalTarget || 500;
   const progressPercent = Math.min(Math.round((totalAmount / targetGoal) * 100), 100);
@@ -352,31 +395,32 @@ export default function App() {
       {/* 4. MAIN BENTO GRID DASHBOARD */}
       <main id="dashboard-content" className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pb-20 space-y-6">
         
-        {/* Dynamic mini-metrics grid */}
-        <div id="stats-dashboard-grid" className="grid grid-cols-3 gap-3">
-          <div className="bg-brand-cream-light border border-brand-cream-dark/80 rounded-xl p-3 text-center">
-            <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Soutiens</span>
-            <span className="text-sm sm:text-base font-extrabold text-brand-navy mt-0.5 flex items-center justify-center gap-1">
-              <HeartIcon className="w-3.5 h-3.5 text-brand-orange fill-current" />
-              {totalSupporters}
-            </span>
+        {/* Dynamic mini-metrics grid — 2 cartes : cafés récoltés + sécurité */}
+        <div className="space-y-2">
+          <div id="stats-dashboard-grid" className="grid grid-cols-2 gap-3">
+            <div className="bg-brand-cream-light border border-brand-cream-dark/80 rounded-xl p-3 text-center">
+              <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">CAFÉS RÉCOLTÉS</span>
+              <span className="text-sm sm:text-base font-extrabold text-brand-navy mt-0.5 flex items-center justify-center gap-1">
+                <CoffeeIcon className="w-3.5 h-3.5 text-brand-orange fill-current" />
+                {coffeesCollected}
+              </span>
+            </div>
+
+            <div className="bg-brand-cream-light border border-brand-cream-dark/80 rounded-xl p-3 text-center">
+              <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Sécurité</span>
+              <span className="text-sm sm:text-base font-extrabold text-emerald-600 mt-0.5 flex items-center justify-center gap-1">
+                <LockIcon className="w-3 h-3 text-emerald-500" />
+                Stripe Direct
+              </span>
+            </div>
           </div>
 
-          <div className="bg-brand-cream-light border border-brand-cream-dark/80 rounded-xl p-3 text-center">
-            <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Cafés récoltés</span>
-            <span className="text-sm sm:text-base font-extrabold text-brand-navy mt-0.5 flex items-center justify-center gap-1">
-              <CoffeeIcon className="w-3.5 h-3.5 text-brand-orange fill-current" />
-              {Math.round(totalAmount / 5)}
-            </span>
-          </div>
-
-          <div className="bg-brand-cream-light border border-brand-cream-dark/80 rounded-xl p-3 text-center">
-            <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Sécurité</span>
-            <span className="text-sm sm:text-base font-extrabold text-emerald-600 mt-0.5 flex items-center justify-center gap-1">
-              <LockIcon className="w-3 h-3 text-emerald-500" />
-              Stripe Direct
-            </span>
-          </div>
+          {/* Date de mise à jour du mur public — affichée seulement si wall.json l'a fournie */}
+          {wallUpdatedAt && (
+            <p id="wall-updated-at" className="text-[10px] text-slate-400/80 text-center">
+              Mis à jour le {wallUpdatedAt}
+            </p>
+          )}
         </div>
 
         {/* Layout split */}
@@ -547,7 +591,7 @@ export default function App() {
               <div className="flex items-center justify-between border-b border-brand-cream-dark/40 pb-2.5">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                   <UsersIcon className="w-4 h-4 text-brand-orange" />
-                  Mur de soutien ({totalSupporters})
+                  Mur de soutien
                 </h3>
                 <span className="text-[10px] font-mono text-slate-400">
                   Récent
