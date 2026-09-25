@@ -53,6 +53,11 @@ export default function App() {
   const [isAdminView, setIsAdminView] = useState(false);
   const [modalInitialSuccess, setModalInitialSuccess] = useState(false);
   const [lastPaymentAmount, setLastPaymentAmount] = useState<number>(0);
+  // Identité du paiement en cours de retour (nom + message) : le modal ouvert par
+  // l'URL de retour n'a jamais vu le formulaire, donc ses états name/isAnonymous
+  // sont vides et tout s'affichait « Anonyme ».
+  const [lastPaymentName, setLastPaymentName] = useState<string>('');
+  const [lastPaymentMessage, setLastPaymentMessage] = useState<string>('');
 
   // Load contributions from localstorage on mount.
   // Le profil public est TOUJOURS celui compilé dans src/utils/defaults.ts : la
@@ -88,6 +93,10 @@ export default function App() {
       if (pendingStr) {
         try {
           const pending = JSON.parse(pendingStr);
+          // Capturer l'identité AVANT le localStorage.removeItem('pending_contribution')
+          // (dans le finally ci-dessous), sinon l'écran de succès ne peut plus la lire.
+          setLastPaymentName(pending.name || '');
+          setLastPaymentMessage(pending.message || '');
           const contribution: Contribution = {
             id: `contrib-${Date.now()}`,
             name: pending.name || "Anonyme",
@@ -157,9 +166,7 @@ export default function App() {
       <header id="app-top-header" className="bg-brand-navy border-b border-slate-800/80 sticky top-0 z-30 text-white shadow-md">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-orange flex items-center justify-center text-white font-extrabold text-sm shadow-sm">
-              ☕
-            </div>
+            <img src="/logo-mark.png" alt="HUVI Optimisation" className="w-8 h-8 rounded-lg shadow-sm" />
             <span className="font-extrabold text-xs sm:text-sm tracking-wider text-white uppercase">HUVI Café</span>
           </div>
 
@@ -234,7 +241,7 @@ export default function App() {
           {/* Avatar frame */}
           <div className="relative">
             {profile.avatarUrl ? (
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-brand-warm-cream overflow-hidden shadow-md bg-white flex items-center justify-center">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-brand-warm-cream overflow-hidden shadow-md bg-white flex items-center justify-center">
                 <img 
                   id="creator-avatar"
                   src={profile.avatarUrl} 
@@ -245,7 +252,7 @@ export default function App() {
               </div>
             ) : (
               /* Premium elegant initials avatar */
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-brand-orange border-4 border-brand-warm-cream flex items-center justify-center text-white relative shadow-md overflow-hidden">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-brand-orange border-4 border-brand-warm-cream flex items-center justify-center text-white relative shadow-md overflow-hidden">
                 <span className="font-extrabold text-xl tracking-wider text-white">
                   {profile.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || "HO"}
                 </span>
@@ -412,7 +419,7 @@ export default function App() {
                   Offrez un café pour soutenir mes créations
                 </h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  Votre geste m'aide grandement à concevoir, maintenir et partager des dizaines d'outils performants en accès libre.
+                  Votre soutien m'aide grandement à continuer de concevoir, bâtir et partager des dizaines d'outils performants et gratuits pour la communauté.
                 </p>
               </div>
 
@@ -563,6 +570,8 @@ export default function App() {
         onAddContribution={handleAddContribution}
         initialSuccess={modalInitialSuccess}
         successAmount={lastPaymentAmount}
+        initialName={lastPaymentName}
+        initialMessage={lastPaymentMessage}
       />
 
       {/* 8. REAL-TIME CELEBRATIVE WALL TICKER */}
