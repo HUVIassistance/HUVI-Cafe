@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { 
   Coffee as CoffeeIcon, 
   Heart as HeartIcon, 
@@ -28,6 +28,35 @@ const DevCustomizerPanel = import.meta.env.DEV
   ? lazy(() => import('./components/CustomizerPanel'))
   : null;
 
+// MUR DE SOUTIEN PUBLIC
+// Le mur n'est plus reconstruit dans le navigateur de chaque visiteur : il vit dans
+// `public/wall.json`, un fichier versionné dans le repo et alimenté à la main
+// (aucun service, aucune clé, aucun webhook, aucune automatisation). Il est lu au montage.
+// Si le fichier est absent, vide ou invalide, on retombe proprement sur DEFAULT_CONTRIBUTIONS.
+
+// Normalise une entrée brute de wall.json en Contribution affichable.
+// Toute entrée incomplète (nom vide, montant non numérique) est ignorée.
+function wallEntryToContribution(entry: unknown, index: number): Contribution | null {
+  if (!entry || typeof entry !== 'object') return null;
+  const raw = entry as { name?: unknown; amount?: unknown; message?: unknown; date?: unknown };
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  const amount = typeof raw.amount === 'number' ? raw.amount : Number(raw.amount);
+  if (!name || !Number.isFinite(amount) || amount <= 0) return null;
+  const message = typeof raw.message === 'string' ? raw.message : '';
+  const parsedDate = typeof raw.date === 'string' ? new Date(raw.date) : null;
+  const timestamp = parsedDate && !Number.isNaN(parsedDate.getTime())
+    ? parsedDate.toISOString()
+    : new Date().toISOString();
+  // Les entrées publiques sont préfixées `wall-` ; les contributions locales `contrib-`.
+  return { id: `wall-${index}`, name, amount, message, timestamp };
+}
+
+// Deux soutiens identiques (même nom, même montant, même message) ne comptent qu'une fois :
+// ainsi un don local déjà ajouté au mur public n'apparaît pas en double.
+function contributionSignature(c: Contribution): string {
+  return `${c.name.trim().toLowerCase()}|${c.amount}|${c.message.trim().toLowerCase()}`;
+}
+
 function formatRelativeTime(isoString: string): string {
   try {
     const diffMs = Date.now() - new Date(isoString).getTime();
@@ -47,7 +76,10 @@ function formatRelativeTime(isoString: string): string {
 
 export default function App() {
   const [profile, setProfile] = useState<CreatorProfile>(DEFAULT_PROFILE);
-  const [contributions, setContributions] = useState<Contribution[]>(DEFAULT_CONTRIBUTIONS);
+  // Mur public (wall.json) et soutiens locaux du visiteur sont gardés séparément ;
+  // `contributions` ci-dessous est l'union affichée et comptée.
+  const [wallContributions, setWallContributions] = useState<Contribution[]>([]);
+  const [localContributions, setLocalContributions] = useState<Contribution[]>([]);
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
@@ -59,7 +91,7 @@ export default function App() {
   const [lastPaymentName, setLastPaymentName] = useState<string>('');
   const [lastPaymentMessage, setLastPaymentMessage] = useState<string>('');
 
-  // Load contributions from localstorage on mount.
+  // Mount : profil, soutiens locaux du visiteur, retour de paiement, puis mur public.
   // Le profil public est TOUJOURS celui compilé dans src/utils/defaults.ts : la
   // surcharge localStorage (outil de gestion local) n'existe qu'en développement.
   useEffect(() => {
@@ -74,14 +106,18 @@ export default function App() {
       }
     }
 
-    let currentContribs = DEFAULT_CONTRIBUTIONS;
+    // 1. Soutiens locaux du visiteur (son propre don : effet immédiat sur SON écran ;
+    // la publication sur le mur public se fait ensuite, à la main, dans wall.json).
+    let currentContribs: Contribution[] = [];
     const savedContribs = localStorage.getItem('contributions');
     if (savedContribs) {
       try {
-        currentContribs = JSON.parse(savedContribs);
-        setContributions(currentContribs);
+        const parsed = JSON.parse(savedContribs);
+        if (Array.isArray(parsed)) {
+          currentContribs = parsed as Contribution[];
+        }
       } catch (e) {
-        console.error("Error parsing saved contributions, using defaults", e);
+        console.error("Error parsing saved contributions, ignoring them", e);
       }
     }
 
@@ -104,11 +140,11 @@ export default function App() {
             message: pending.message || "",
             timestamp: new Date().toISOString()
           };
-          
+
           const updated = [contribution, ...currentContribs];
-          setContributions(updated);
+          currentContribs = updated;
           localStorage.setItem('contributions', JSON.stringify(updated));
-          
+
           // Open the modal directly in the Success view
           setLastPaymentAmount(contribution.amount);
           setModalInitialSuccess(true);
@@ -125,7 +161,50 @@ export default function App() {
       const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
     }
+
+    setLocalContributions(currentContribs);
+
+    // 2. Mur public réel : fichier versionné dans le repo, lu au montage.
+    // Dégradation propre : fichier absent, vide ou invalide → mur vide en état →
+    // repli automatique sur DEFAULT_CONTRIBUTIONS (aucune erreur visible pour le visiteur).
+    let cancelled = false;
+    fetch('/wall.json', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data: unknown) => {
+        if (cancelled) return;
+        const rawList = (data as { soutiens?: unknown } | null)?.soutiens;
+        const entries = Array.isArray(rawList) ? rawList : [];
+        setWallContributions(
+          entries
+            .map((entry, index) => wallEntryToContribution(entry, index))
+            .filter((item): item is Contribution => item !== null)
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn("Mur de soutien public indisponible : repli sur les soutiens par défaut.", err);
+        setWallContributions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Mur affiché = soutiens publics (wall.json) + soutiens locaux du visiteur, sans doublon.
+  // Un mur public vide ou invalide retombe sur DEFAULT_CONTRIBUTIONS : jamais d'écran cassé,
+  // jamais de chiffre inventé.
+  const contributions: Contribution[] = useMemo(() => {
+    const publicWall = wallContributions.length > 0 ? wallContributions : DEFAULT_CONTRIBUTIONS;
+    const seen = new Set(publicWall.map(contributionSignature));
+    const ownAndNotPublicYet = localContributions.filter((item) => {
+      const signature = contributionSignature(item);
+      if (seen.has(signature)) return false;
+      seen.add(signature);
+      return true;
+    });
+    return [...ownAndNotPublicYet, ...publicWall];
+  }, [wallContributions, localContributions]);
 
   const handleSaveProfile = (updatedProfile: CreatorProfile) => {
     setProfile(updatedProfile);
@@ -134,7 +213,9 @@ export default function App() {
 
   const handleResetProfile = () => {
     setProfile(DEFAULT_PROFILE);
-    setContributions(DEFAULT_CONTRIBUTIONS);
+    // Réinitialise les données locales du visiteur. Le mur public (wall.json) n'est
+    // PAS touché : il appartient au repo, pas au navigateur.
+    setLocalContributions([]);
     localStorage.removeItem('creator_profile');
     localStorage.removeItem('contributions');
   };
@@ -145,9 +226,9 @@ export default function App() {
       id: `contrib-${Date.now()}`,
       timestamp: new Date().toISOString()
     };
-    
-    const updated = [contribution, ...contributions];
-    setContributions(updated);
+
+    const updated = [contribution, ...localContributions];
+    setLocalContributions(updated);
     localStorage.setItem('contributions', JSON.stringify(updated));
   };
 
@@ -241,7 +322,7 @@ export default function App() {
           {/* Avatar frame */}
           <div className="relative">
             {profile.avatarUrl ? (
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-brand-warm-cream overflow-hidden shadow-md bg-white flex items-center justify-center">
+              <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-brand-warm-cream overflow-hidden shadow-md bg-white flex items-center justify-center">
                 <img 
                   id="creator-avatar"
                   src={profile.avatarUrl} 
@@ -252,7 +333,7 @@ export default function App() {
               </div>
             ) : (
               /* Premium elegant initials avatar */
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-brand-orange border-4 border-brand-warm-cream flex items-center justify-center text-white relative shadow-md overflow-hidden">
+              <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-brand-orange border-4 border-brand-warm-cream flex items-center justify-center text-white relative shadow-md overflow-hidden">
                 <span className="font-extrabold text-xl tracking-wider text-white">
                   {profile.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || "HO"}
                 </span>
